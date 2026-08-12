@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cover Letter Copilot</title>
+    <style>
+      /* Warm paper by default: this is a page you sit and type your address
+         into, not a HUD floating over a job ad. The panel stays dark; this
+         doesn't. Follows the OS setting either way. */
+      :root {
+        color-scheme: light dark;
+        --bg: #F5F3EF;
+        --surface: #FFFFFF;
+        --surface-2: #FAF8F5;
+        --border: #E4DED3;
+        --border-strong: #D3CBBC;
+        --text: #262320;
+        --muted: #6B655B;
+        --faint: #918A7E;
+        --accent: #A9661F;
+        --accent-hover: #8E5518;
+        --accent-ink: #FFFFFF;
+        --ring: rgba(169, 102, 31, .18);
+        --ok: #2C7A52;
+        --danger: #A8302A;
+        --shadow: 0 1px 2px rgba(38, 35, 32, .05), 0 1px 3px rgba(38, 35, 32, .04);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16181C;
+          --surface: #1D2026;
+          --surface-2: #22262D;
+          --border: #2F343D;
+          --border-strong: #3C424D;
+          --text: #E9E7E2;
+          --muted: #9CA2AD;
+          --faint: #7A808B;
+          --accent: #E0A458;
+          --accent-hover: #EDB670;
+          --accent-ink: #23180A;
+          --ring: rgba(224, 164, 88, .22);
+          --ok: #5FBF8F;
+          --danger: #E0685A;
+          --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+        }
+      }
+
+      /* The bug that made the columns overlap: inputs were width:100% *plus*
+         padding and border, so every field was 20px wider than its cell. */
+      *, *::before, *::after { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 36px 20px 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 880px; margin: 0 auto; }
+
+      header { margin-bottom: 26px; }
+      h1 { font-size: 21px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 4px; }
+      .sub { color: var(--muted); font-size: 14px; margin: 0; }
+
+      section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px 24px 24px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+      }
+      h2 {
+        font-size: 11px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase;
+        color: var(--faint); margin: 0 0 18px; padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      /* One field = label + control, spaced as a unit. Stops labels from
+         colliding with the control above them when a row wraps. */
+      .field { display: flex; flex-direction: column; min-width: 0; margin-bottom: 16px; }
+      .field:last-child { margin-bottom: 0; }
+      label { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+
+      input, textarea, select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        transition: border-color .12s, box-shadow .12s, background .12s;
+      }
+      input::placeholder, textarea::placeholder { color: var(--faint); }
+      input[type="checkbox"] { width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
+      input:hover, textarea:hover, select:hover { border-color: var(--faint); }
+      input:focus, textarea:focus, select:focus {
+        outline: none;
+        background: var(--surface);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--ring);
+      }
+      textarea { resize: vertical; line-height: 1.6; min-height: 76px; }
+      textarea.tall { min-height: 260px; }
+
+      .grid { display: grid; gap: 0 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+      .grid-2 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+      button {
+        padding: 9px 15px; border-radius: 8px; border: 1px solid var(--border-strong);
+        background: var(--surface-2); color: var(--text); font: inherit; font-size: 13.5px;
+        font-weight: 500; cursor: pointer; transition: background .12s, border-color .12s;
+      }
+      button:hover:not(:disabled) { background: var(--bg); border-color: var(--faint); }
+      button:disabled { opacity: .4; cursor: not-allowed; }
+      button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); border-color: var(--accent); }
+      button.primary {
+        background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600;
+      }
+      button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+      button.mini { padding: 6px 11px; font-size: 12.5px; }
+
+      .bar { display: flex; align-items: center; gap: 10px; }
+      .note { font-size: 13px; color: var(--muted); margin-top: 14px; line-height: 1.55; }
+      .note code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        padding: 1px 5px; border-radius: 4px; color: var(--accent);
+      }
+
+      .entry {
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 16px 18px 18px; margin-bottom: 12px; background: var(--surface-2);
+      }
+      .entry .head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+      .entry .head .idx {
+        flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+        text-transform: uppercase; color: var(--faint);
+      }
+      .empty {
+        color: var(--faint); font-size: 13.5px; padding: 14px 0 4px; font-style: italic;
+      }
+
+      .savebar {
+        position: sticky; bottom: 0; z-index: 5;
+        display: flex; align-items: center; gap: 14px;
+        padding: 16px 0 20px; margin-top: 20px;
+        background: var(--bg); border-top: 1px solid var(--border);
+      }
+      .saved { font-size: 13.5px; font-weight: 500; color: var(--ok); opacity: 0; transition: opacity .2s; }
+      .saved.on { opacity: 1; }
+      .io-msg { font-size: 13.5px; font-weight: 500; opacity: 0; transition: opacity .2s; }
+      .io-msg.on { opacity: 1; }
+      .io-msg.ok { color: var(--ok); }
+      .io-msg.err { color: var(--danger); }
+      .resume-review { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 18px; }
+      .resume-review[hidden] { display: none; }
+      .review-title { font-size: 15px; font-weight: 650; margin: 0 0 4px; }
+      .review-summary { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+      .suggestions { display: grid; gap: 8px; margin-bottom: 16px; }
+      .suggestion {
+        display: grid; grid-template-columns: 20px minmax(120px, .45fr) minmax(0, 1fr);
+        align-items: start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border);
+        border-radius: 8px; background: var(--surface-2);
+      }
+      .suggestion input { margin-top: 3px; }
+      .suggestion .key { font-size: 12px; font-weight: 650; color: var(--muted); }
+      .suggestion .value { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .suggestion .conflict { display: block; color: var(--danger); font-size: 11.5px; margin-top: 3px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Cover Letter Copilot</h1>
+        <p class="sub">Settings stay in this browser. Drafting and résumé import send the required text through your local server to your configured model provider; the API key stays in the server.</p>
+      </header>
+
+      <section>
+        <h2>Import résumé</h2>
+        <div class="bar">
+          <button id="resumeImportBtn" type="button">Choose résumé</button>
+          <input id="resumeImportFile" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" hidden />
+          <span class="io-msg" id="resumeImportMsg"></span>
+        </div>
+        <div class="note">
+          PDF, DOCX, TXT, or MD; maximum 8 MB. The local server extracts its text, then sends that text to your configured model provider to suggest profile fields. Nothing is saved or placed into a job application until you review and approve it.
+        </div>
+        <div id="resumeReview" class="resume-review" hidden>
+          <p class="review-title">Review imported suggestions</p>
+          <p id="resumeReviewSummary" class="review-summary"></p>
+          <div id="resumeSuggestions" class="suggestions"></div>
+          <div class="bar">
+            <button id="resumeApply" class="primary" type="button">Apply selected to form</button>
+            <button id="resumeDiscard" type="button">Discard</button>
+          </div>
+          <div class="note">Existing values are unchecked by default. Applying changes updates this settings form only; press <strong>Save settings</strong> after your final review.</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>You</h2>
+        <div class="grid">
+          <div class="field"><label for="honorificPrefix">Title / prefix</label><input id="honorificPrefix" placeholder="e.g. Mr, Ms, Dr" autocomplete="off" /></div>
+          <div class="field"><label for="firstName">First name</label><input id="firstName" autocomplete="off" /></div>
+          <div class="field"><label for="middleName">Middle name</label><input id="middleName" autocomplete="off" /></div>
+          <div class="field"><label for="lastName">Last name</label><input id="lastName" autocomplete="off" /></div>
+          <div class="field"><label for="preferredName">Preferred name</label><input id="preferredName" autocomplete="off" /></div>
+          <div class="field"><label for="honorificSuffix">Name suffix</label><input id="honorificSuffix" placeholder="e.g. Jr, PhD" autocomplete="off" /></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="off" /></div>
+          <div class="field"><label for="phoneCountryCode">Phone country code</label><input id="phoneCountryCode" placeholder="e.g. +64" autocomplete="off" /></div>
+          <div class="field"><label for="phone">Phone</label><input id="phone" autocomplete="off" /></div>
+          <div class="field"><label for="phoneExtension">Phone extension</label><input id="phoneExtension" autocomplete="off" /></div>
+          <div class="field"><label for="phoneAreaCode">Phone area code (rare split forms)</label><input id="phoneAreaCode" autocomplete="off" /></div>
+          <div class="field"><label for="phoneLocalPrefix">Phone local prefix (rare)</label><input id="phoneLocalPrefix" autocomplete="off" /></div>
+          <div class="field"><label for="phoneLocalSuffix">Phone local suffix (rare)</label><input id="phoneLocalSuffix" autocomplete="off" /></div>
+        </div>
+        <div class="note">Forms that ask for one “Full name” box get first + last joined automatically.</div>
+      </section>
+
+      <section>
+        <h2>Address</h2>
+        <div class="field"><label for="addressLine1">Street address</label><input id="addressLine1" autocomplete="off" /></div>
+        <div class="field"><label for="addressLine2">Line 2 — unit, apartment (optional)</label><input id="addressLine2" autocomplete="off" /></div>
+        <div class="field"><label for="addressLine3">Address line 3 (optional)</label><input id="addressLine3" autocomplete="off" /></div>
+        <div class="grid">
+          <div class="field"><label for="district">District / county</label><input id="district" autocomplete="off" /></div>
+          <div class="field"><label for="city">City / suburb</label><input id="city" autocomplete="off" /></div>
+          <div class="field"><label for="state">State</label><input id="state" placeholder="e.g. VIC" autocomplete="off" /></div>
+          <div class="field"><label for="postcode">Postcode</label><input id="postcode" autocomplete="off" /></div>
+          <div class="field"><label for="country">Country</label><input id="country" placeholder="e.g. Australia" autocomplete="off" /></div>
+          <div class="field"><label for="countryCode">Country code</label><input id="countryCode" placeholder="e.g. AU" maxlength="3" autocomplete="off" /></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Links</h2>
+        <div class="grid">
+          <div class="field"><label for="linkedin">LinkedIn</label><input id="linkedin" autocomplete="off" /></div>
+          <div class="field"><label for="github">GitHub</label><input id="github" autocomplete="off" /></div>
+          <div class="field"><label for="website">Portfolio / website</label><input id="website" autocomplete="off" /></div>
+          <div class="field"><label for="twitter">X / Twitter</label><input id="twitter" autocomplete="off" /></div>
+          <div class="field"><label for="facebook">Facebook</label><input id="facebook" autocomplete="off" /></div>
+          <div class="field"><label for="skype">Skype</label><input id="skype" autocomplete="off" /></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>The questions every form asks</h2>
+        <div class="field">
+          <label for="workRights">Work rights</label>
+          <input id="workRights" placeholder="e.g. Australian citizen — full working rights" autocomplete="off" />
+        </div>
+        <div class="grid grid-2">
+          <div class="field"><label for="noticePeriod">Notice period / availability</label><input id="noticePeriod" placeholder="e.g. 2 weeks" autocomplete="off" /></div>
+          <div class="field"><label for="availabilityDate">Earliest start date</label><input id="availabilityDate" placeholder="YYYY-MM-DD or a date phrase" autocomplete="off" /></div>
+          <div class="field"><label for="salary">Salary expectation</label><input id="salary" placeholder="e.g. 85,000–95,000 + super" autocomplete="off" /></div>
+          <div class="field"><label for="salaryCurrency">Salary currency</label><input id="salaryCurrency" placeholder="e.g. NZD" autocomplete="off" /></div>
+          <div class="field"><label for="sponsorship">Need visa sponsorship?</label><select id="sponsorship"><option value=""></option><option>Yes</option><option>No</option></select></div>
+          <div class="field"><label for="willingToRelocate">Willing to relocate?</label><select id="willingToRelocate"><option value=""></option><option>Yes</option><option>No</option></select></div>
+          <div class="field"><label for="drivingLicence">Have a driving licence?</label><select id="drivingLicence"><option value=""></option><option>Yes</option><option>No</option></select></div>
+          <div class="field"><label for="source">Usual application source</label><input id="source" placeholder="e.g. SEEK, LinkedIn" autocomplete="off" /></div>
+        </div>
+        <div class="note">Saved Yes/No answers can fill exact radio or dropdown choices. Consent, demographic, legal-disclosure and identity-document questions are always left for you.</div>
+      </section>
+
+      <section>
+        <h2>Work history</h2>
+        <div id="workList"></div>
+        <div class="bar"><button id="workAdd" class="mini" type="button">Add a role</button></div>
+        <div class="note">Newest first. Mark an entry as current when appropriate. The top entry fills standalone “current employer” and “current job title” fields; all entries are given to the model as facts it may draw on.</div>
+      </section>
+
+      <section>
+        <h2>Education</h2>
+        <div id="eduList"></div>
+        <div class="bar"><button id="eduAdd" class="mini" type="button">Add a qualification</button></div>
+      </section>
+
+      <section>
+        <h2>Languages</h2>
+        <div id="languageList"></div>
+        <div class="bar"><button id="languageAdd" class="mini" type="button">Add a language</button></div>
+        <div class="note">Used only when a visible application form asks for language and proficiency records.</div>
+      </section>
+
+      <section>
+        <h2>Résumé</h2>
+        <div class="field">
+          <label for="resume">Paste the full text</label>
+          <textarea id="resume" class="tall" placeholder="Roles, dates, what you built, results. The letter can only use facts that appear here or in the sections above."></textarea>
+        </div>
+        <div class="note">The draft is restricted to what's in this box and the fields above. If something isn't here, it won't be claimed.</div>
+      </section>
+
+      <section>
+        <h2>Templates</h2>
+        <div class="field"><label for="tplPick">Edit template</label><select id="tplPick"></select></div>
+        <div class="field"><label for="tplName">Name</label><input id="tplName" /></div>
+        <div class="grid grid-2">
+          <div class="field"><label for="tplWords">Word limit</label><input id="tplWords" type="number" min="80" max="600" /></div>
+          <div class="field"><label for="tplTone">Voice</label><input id="tplTone" /></div>
+        </div>
+        <div class="field"><label for="tplSkeleton">Structure — one line per paragraph</label><textarea id="tplSkeleton" rows="6"></textarea></div>
+        <div class="field"><label for="tplRules">Extra rules</label><textarea id="tplRules" rows="3"></textarea></div>
+        <div class="bar">
+          <button id="tplNew" type="button">New template</button>
+          <button id="tplDelete" type="button">Delete</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Local server</h2>
+        <div class="field"><label for="server">Address</label><input id="server" placeholder="http://127.0.0.1:8787" /></div>
+        <div class="note">Start it with <code>npm start</code> in the <code>server</code> folder before drafting.</div>
+      </section>
+
+      <section>
+        <h2>Backup</h2>
+        <div class="bar">
+          <button id="exportBtn" type="button">Export to file</button>
+          <button id="importBtn" type="button">Import from file</button>
+          <input id="importFile" type="file" accept="application/json,.json" hidden />
+          <span class="io-msg" id="ioMsg"></span>
+        </div>
+        <div class="note">
+          Chrome ties this extension's storage to the folder you loaded it from, so
+          <strong>moving or renaming the project folder loses these settings</strong>. Keep an
+          exported copy somewhere outside the project and importing it back is a ten-second job.
+          The file holds your personal details and résumé in plain text — it does
+          <em>not</em> contain your API key, which lives in <code>server/.env</code>.
+        </div>
+      </section>
+
+      <div class="savebar">
+        <button class="primary" id="save" type="button">Save settings</button>
+        <span class="saved" id="saved">Saved</span>
+      </div>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
