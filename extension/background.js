@@ -34,13 +34,79 @@ const STARTER_TEMPLATES = [
       'One closing line.'
     ].join('\n'),
     rules: 'No superlatives about the firm. Every claim must be defensible in an interview.'
+  },
+  /* Not one per stack (web dev, full-stack, backend) — that's just Engineering-
+     first with different nouns. These four exist because the underlying logic
+     of the letter actually differs: what gets led with, what counts as proof,
+     what the failure mode of "sounding like everyone else applying" is. */
+  {
+    id: 'ai',
+    name: 'AI / ML-first',
+    maxWords: 250,
+    tone: 'Technical and precise, not evangelical. Comfortable naming models and methods, grounded in what happened when it ran.',
+    skeleton: [
+      'One opening line naming the role and the specific ML/AI problem area I have worked in — not enthusiasm about AI in general.',
+      'A paragraph matching two or three requirements from the ad to a model, pipeline or system I actually built — name the approach, then what happened when it shipped: accuracy, latency, adoption, cost.',
+      'A short paragraph on why this company\'s specific problem or data — reference something real from the ad, not the field in general.',
+      'One closing line.'
+    ].join('\n'),
+    rules: 'Do not claim state-of-the-art results, published research or benchmarks unless they are in my résumé. Name frameworks, models or datasets only if they appear there. No AI-hype language: "revolutionize", "cutting-edge", "game-changing".'
+  },
+  {
+    id: 'data',
+    name: 'Data-first',
+    maxWords: 250,
+    tone: 'Evidence-driven and precise. Leads with the question or decision, not the tool used to answer it.',
+    skeleton: [
+      'One opening line naming the role and the kind of question or decision my work has driven — not the tools I used to drive it.',
+      'A paragraph matching two or three requirements from the ad to analysis I have actually done — what the data showed, and what decision or system changed because of it.',
+      'A short paragraph on why this company\'s data or product specifically — reference something concrete from the ad.',
+      'One closing line.'
+    ].join('\n'),
+    rules: 'Name tools (SQL, Python, dbt, etc.) only if they appear in my résumé. Prefer the decision or outcome an analysis produced over the technique used to produce it.'
+  },
+  {
+    id: 'consulting',
+    name: 'Consulting-first',
+    maxWords: 300,
+    tone: 'Structured and confident, business-outcome oriented. Reads like a compressed case, not an academic essay.',
+    skeleton: [
+      'Open with the type of problem or client situation that draws me to this role — not enthusiasm about the firm.',
+      'A paragraph structured as a mini case: a real situation, what I did, the measurable outcome — mapped to one or two things the ad is asking for.',
+      'A short paragraph on why this firm\'s practice area or approach specifically — reference something real from the ad or the firm\'s work.',
+      'One closing line. No restating the whole CV.'
+    ].join('\n'),
+    rules: 'Every outcome needs a number or a concrete result if my résumé has one — no vague "improved efficiency". No consulting clichés: "trusted advisor", "strategic thinker", "thrives in a fast-paced environment".'
+  },
+  {
+    id: 'general',
+    name: 'General-purpose',
+    maxWords: 220,
+    tone: 'Plain, honest, specific. Let the actual experience do the work instead of forcing a technical or business voice that isn\'t there yet.',
+    skeleton: [
+      'One opening line naming the role and the single most relevant thing about my background for it.',
+      'A paragraph connecting two or three things the ad asks for to real experience — study, work or projects — honest about what is direct experience and what is transferable.',
+      'A short paragraph on why this company or role specifically — reference something real from the ad.',
+      'One closing line.'
+    ].join('\n'),
+    rules: 'Do not force a technical or industry voice my résumé does not support. It is fine to be candid about being early-career or changing direction.'
   }
 ];
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   const s = await chrome.storage.local.get(['templates']);
-  if (!s.templates || !s.templates.length) {
+  const existing = Array.isArray(s.templates) ? s.templates : [];
+  if (!existing.length) {
     await chrome.storage.local.set({ templates: STARTER_TEMPLATES, defaultTemplate: 'eng' });
+  } else {
+    /* onInstalled also fires with reason "update" on every version bump, which
+       is what lets a newly added starter template (e.g. this file gaining
+       "ai"/"data"/"consulting") reach someone who installed before it existed.
+       Additive only, matched by id — never touches a template already saved,
+       even if they renamed or rewrote one that started as a starter. */
+    const knownIds = new Set(existing.map((t) => t.id));
+    const additions = STARTER_TEMPLATES.filter((t) => !knownIds.has(t.id));
+    if (additions.length) await chrome.storage.local.set({ templates: [...existing, ...additions] });
   }
   /* The tool is useless until it knows who you are, so say so on day one
      rather than letting the first draft come back empty. */

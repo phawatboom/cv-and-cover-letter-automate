@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cover Letter Copilot",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Fills in the repetitive parts of a job application and drafts a cover letter from the ad you're reading — after you've read it.",
   "permissions": ["storage", "downloads", "scripting", "activeTab", "webNavigation"],
   "host_permissions": [
