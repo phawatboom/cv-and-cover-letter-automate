@@ -111,6 +111,30 @@ const unrelatedWorkCheckbox = field('May we contact this employer?', { type: 'ch
 unrelatedWorkCheckbox.workContainer = firstWork;
 assert.equal(api.classify(unrelatedWorkCheckbox), null);
 
+// A screening question sharing a work-history section can contain the same
+// bare words ("to", "employer") as a real from/to date or company-name label.
+// It must stay unmatched rather than being claimed by either rule.
+const contactQuestion = field('Is it OK to contact this employer?', { type: 'radio' });
+contactQuestion.workContainer = firstWork;
+assert.equal(api.classify(contactQuestion), null);
+
+const reasonQuestion = field('What would you like us to know about this role?');
+reasonQuestion.workContainer = firstWork;
+assert.equal(api.classify(reasonQuestion), null);
+
+// Genuine short field labels for the same words must still resolve.
+const toField = field('To');
+toField.workContainer = firstWork;
+assert.equal(api.classify(toField).key, 'work.0.end');
+
+const fromField = field('From (MM/YYYY)');
+fromField.workContainer = secondWork;
+assert.equal(api.classify(fromField).key, 'work.1.start');
+
+const companyField = field('Employer');
+companyField.workContainer = firstWork;
+assert.equal(api.classify(companyField).key, 'work.0.company');
+
 assert.equal(api.formatValue(field('Middle initial', { maxLength: 1 }), 'middleName', 'Quinn', {}), 'Q');
 assert.equal(api.formatValue(field('Start', { type: 'date' }), 'availabilityDate', 'Feb 2027', {}), '2027-02-01');
 assert.equal(api.formatValue(field('Start', { type: 'month' }), 'work.0.start', '2026-8', {}), '2026-08');

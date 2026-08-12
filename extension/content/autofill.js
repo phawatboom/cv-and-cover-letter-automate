@@ -140,9 +140,20 @@
     if (type === 'checkbox') {
       return /currently|current\s*(role|job|school|student)|still\s*(work|employed|attend|stud)|present/i.test(hay) ? hit('current') : null;
     }
-    if (/\bfrom\b|start\s*date/i.test(hay)) return hit('start');
-    if (/\bto\b|end\s*date/i.test(hay)) return hit('end');
+
     if (/description|summary|responsibilit|what you did|achievement/i.test(hay)) return hit('summary');
+
+    // Everything below matches on a single bare keyword ("to", "employer",
+    // "title"...), which is fine for a real field label ("From", "Company")
+    // but the same words turn up mid-sentence in an unrelated screening
+    // question sharing the section — "Is it OK to contact this employer?"
+    // contains both "to" and "employer". Real labels are short fragments, not
+    // full sentences, so gate every bare-keyword rule on that shape; only the
+    // unambiguous "start date"/"end date" phrase is trusted regardless.
+    const looksLikeFieldLabel = !/\?/.test(hay) && hay.length <= 60;
+    if (/start\s*date/i.test(hay) || (/\bfrom\b/i.test(hay) && looksLikeFieldLabel)) return hit('start');
+    if (/end\s*date/i.test(hay) || (/\bto\b/i.test(hay) && looksLikeFieldLabel)) return hit('end');
+    if (!looksLikeFieldLabel) return null;
 
     if (group === 'work') {
       if (/office\s*location|work\s*location|job\s*location/i.test(hay)) return hit('location');

@@ -37,6 +37,9 @@ without exception:
   particular ad makes relevant.
 - Output the letter body only: no subject line, no address block, no
   commentary, no markdown fences.
+- Separate paragraphs with a single blank line (one clear line break between
+  them). The Save-file button relies on that gap to split the letter into
+  paragraphs.
 `.trim();
 
 function contactLine(p) {

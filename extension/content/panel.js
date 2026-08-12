@@ -114,12 +114,15 @@
       if (r.error) return `<div class="fill"><span class="err">${esc(r.error)}</span></div>`;
       const names = r.filled.map((f) => f.key).join(', ');
       const guessed = r.filled.filter((f) => f.confidence === 'guess').length;
+      const allAlreadyFilled = r.skipped.length > 0 && r.skipped.every((s) => s.why === 'already filled');
       const lines = [
         r.filled.length
           ? `filled <b>${r.filled.length}</b> — ${esc(names)}`
           : r.candidates === 0
             ? 'filled <b>0</b> — no accessible editable fields were found on this page'
-            : 'filled <b>0</b> — no recognised field had a saved value to insert'
+            : allAlreadyFilled
+              ? 'filled <b>0</b> — every recognised field already had a value'
+              : 'filled <b>0</b> — no recognised field had a saved value to insert'
       ];
       if (guessed) lines.push(`<span class="dim">${guessed} matched on label text — check those</span>`);
       if (r.skipped.length) {
