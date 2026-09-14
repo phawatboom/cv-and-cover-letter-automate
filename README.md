@@ -27,7 +27,7 @@ Generate a token:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-On Railway: **New Project → Deploy from GitHub repo**, pick this repo, then in the service settings set **Root Directory** to `server`. `server/railway.json` supplies the start command and points the health check at `/health`, which stays unauthenticated so the platform can reach it. Add three variables — `ANTHROPIC_API_KEY`, `APP_TOKEN`, and `PROVIDER` if you are not using Anthropic — then generate a domain under **Settings → Networking**. Leave `PORT` alone; the platform sets it.
+On Railway: **New Project → Deploy from GitHub repo**, pick this repo, then in the service settings set **Root Directory** to `server` — the builder inspects the repository root, and without this it finds no application to build. `server/railway.json` supplies the start command and points the health check at `/health`, which stays unauthenticated so the platform can reach it. Add three variables — `ANTHROPIC_API_KEY`, `APP_TOKEN`, and `PROVIDER` if you are not using Anthropic — then generate a domain under **Settings → Networking**. Leave `PORT` alone; the platform sets it.
 
 Then in the extension settings, under **Drafting server**, put the public address in **Address** and the same token in **Access token**. `https://*.up.railway.app/*` is already in the manifest; a custom domain needs adding there before Chrome will let the extension reach it.
 
