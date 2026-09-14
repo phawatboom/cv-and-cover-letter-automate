@@ -16,5 +16,8 @@
     "express": "^4.19.2",
     "mammoth": "^1.12.1",
     "pdf-parse": "^2.4.5"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

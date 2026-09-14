@@ -1,6 +1,6 @@
 # Cover Letter Copilot
 
-A local-first browser extension that fills repeat job-application details and drafts a cover letter from the job ad you are reading. It never submits an application.
+A local-first browser extension that fills repeat job-application details and drafts a cover letter from the job ad you are reading. It never submits an application. The drafting server runs on your machine by default, and can be [deployed to a host](#running-the-server-on-a-host) if you would rather not start it by hand.
 
 ## Setup
 
@@ -14,6 +14,26 @@ npm start
 Then open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the `extension/` folder. Open the extension settings and save your profile before using **Fill this form**.
 
 After updating the source, press **Reload** on the extension card in `chrome://extensions` and refresh any job tabs that were already open. A manifest version bump also lets newly added starter templates reach an install that already has templates saved — see [Templates](#templates).
+
+## Running the server on a host
+
+The default setup keeps everything on your machine. If you would rather not start a terminal before each application, the same server runs on any host that gives it a public URL — Railway, Fly, a VPS. The trade is real and worth stating: your résumé text and every job ad you draft against will travel to that host instead of staying on your computer.
+
+One environment variable controls the difference. Setting `APP_TOKEN` switches the bind from `127.0.0.1` to `0.0.0.0` **and** makes `/generate`, `/parse-resume` and `/docx` require `Authorization: Bearer <token>`. Without it the server refuses to listen on a public interface at all, because an unauthenticated `/generate` spends your API balance for anyone who finds the URL.
+
+Generate a token:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+On Railway: **New Project → Deploy from GitHub repo**, pick this repo, then in the service settings set **Root Directory** to `server`. `server/railway.json` supplies the start command and points the health check at `/health`, which stays unauthenticated so the platform can reach it. Add three variables — `ANTHROPIC_API_KEY`, `APP_TOKEN`, and `PROVIDER` if you are not using Anthropic — then generate a domain under **Settings → Networking**. Leave `PORT` alone; the platform sets it.
+
+Then in the extension settings, under **Drafting server**, put the public address in **Address** and the same token in **Access token**. `https://*.up.railway.app/*` is already in the manifest; a custom domain needs adding there before Chrome will let the extension reach it.
+
+Two things to expect from a hosted deployment. Résumé import needs the PDF path, which pulls in `@napi-rs/canvas` — it ships prebuilt Linux binaries, but it is the dependency most likely to need attention if a build fails. And if the platform sleeps idle deployments, the first draft after a quiet spell waits for a cold start.
+
+The access token is deliberately left out of the settings export: that file is meant to be portable, and a credential that spends money does not belong in one. Retype it after a restore.
 
 ## Résumé import and review
 
@@ -154,5 +174,6 @@ extension/
 server/
   server.js
   resume.test.mjs
+  railway.json
   .env.example
 ```

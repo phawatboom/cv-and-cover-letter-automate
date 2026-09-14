@@ -38,7 +38,8 @@
     "https://*.applicantpro.com/*",
     "https://recruiting.paylocity.com/*",
     "https://jobs.zohorecruit.com/*",
-    "http://127.0.0.1:8787/*"
+    "http://127.0.0.1:8787/*",
+    "https://*.up.railway.app/*"
   ],
   "background": { "service_worker": "background.js" },
   "options_page": "options/options.html",

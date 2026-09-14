@@ -1,8 +1,16 @@
-/* Local drafting server.
+/* Drafting server for the browser extension.
    It exists for one reason: the API key must not ship inside a browser
    extension, where any page script or anyone who unpacks the folder can read
-   it. This process holds the key, and binds to loopback only. */
+   it. This process holds the key.
 
+   Run it locally and it binds to loopback, where being unauthenticated is
+   fine. Run it anywhere reachable — Railway, a VPS — and set APP_TOKEN: that
+   switches the bind to 0.0.0.0 and makes every drafting route demand the same
+   token from the extension. Listening off loopback without one is refused at
+   startup, because an open /generate spends your API balance for whoever
+   finds the URL. */
+
+import { timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
@@ -16,6 +24,26 @@ app.use(cors({ origin: [/^chrome-extension:\/\//, /^moz-extension:\/\//] }));
 const PORT = process.env.PORT || 8787;
 const PROVIDER = (process.env.PROVIDER || 'anthropic').toLowerCase();
 const EFFORT = process.env.EFFORT || 'medium';
+const TOKEN = (process.env.APP_TOKEN || '').trim();
+const HOST = process.env.HOST || (TOKEN ? '0.0.0.0' : '127.0.0.1');
+const LOOPBACK = ['127.0.0.1', '::1', 'localhost'].includes(HOST);
+
+/* Compared in constant time so a wrong token can't be narrowed a character at
+   a time by watching how long the answer takes. */
+function tokenMatches(supplied) {
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function requireToken(req, res, next) {
+  if (!TOKEN) return next(); // loopback-only mode: nobody else can reach it
+  const supplied = (req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!supplied || !tokenMatches(supplied)) {
+    return res.status(401).json({ error: 'Wrong or missing access token — check the extension settings.' });
+  }
+  next();
+}
 
 /* ---------------------------------------------------------------- prompt -- */
 
@@ -295,7 +323,7 @@ export { buildPrompt, extractResumeText, parseModelJson, sanitizeResumeProfile }
 
 /* ----------------------------------------------------------------- routes -- */
 
-app.post('/generate', async (req, res) => {
+app.post('/generate', requireToken, async (req, res) => {
   try {
     const { job } = req.body;
     if (!job || !job.description || job.description.length < 100) {
@@ -313,7 +341,7 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-app.post('/parse-resume', async (req, res) => {
+app.post('/parse-resume', requireToken, async (req, res) => {
   try {
     const text = await extractResumeText(req.body || {});
     if (text.length < 80) {
@@ -332,7 +360,7 @@ app.post('/parse-resume', async (req, res) => {
 
 /* Workday and most enterprise ATSs take the cover letter as an attachment
    rather than a text field, so the draft has to become a file. */
-app.post('/docx', async (req, res) => {
+app.post('/docx', requireToken, async (req, res) => {
   const { text = '', name = 'Cover letter' } = req.body;
   const doc = new Document({
     sections: [
@@ -367,7 +395,8 @@ app.get('/', (_, res) => {
      code{font-family:ui-monospace,Menlo,monospace;color:#E0A458}</style>
      <main>
        <h1>Cover Letter Copilot server is running</h1>
-       <p>Provider <code>${PROVIDER}</code> · listening on <code>127.0.0.1:${PORT}</code></p>
+       <p>Provider <code>${PROVIDER}</code> · listening on <code>${HOST}:${PORT}</code> ·
+          ${TOKEN ? 'access token required' : 'loopback only, no token'}</p>
        <p>There's nothing to see here — the browser extension talks to this process,
           you don't. Leave it running while you apply for things.</p>
        <p>Endpoints: <code>POST /generate</code>, <code>POST /parse-resume</code>, <code>POST /docx</code>, <code>GET /health</code></p>
@@ -381,8 +410,20 @@ if (!process.env[keyName]) {
   process.exit(1);
 }
 
+if (!LOOPBACK && !TOKEN) {
+  console.error(
+    `Refusing to listen on ${HOST} without APP_TOKEN. Anyone who found the URL could`,
+    'spend your API balance. Set APP_TOKEN to a long random string, and paste the',
+    'same string into the extension settings.'
+  );
+  process.exit(1);
+}
+
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Cover Letter Copilot server on http://127.0.0.1:${PORT} (${PROVIDER})`);
+  app.listen(PORT, HOST, () => {
+    console.log(
+      `Cover Letter Copilot server on http://${HOST}:${PORT} (${PROVIDER})` +
+        `${TOKEN ? ' — access token required' : ''}`
+    );
   });
 }

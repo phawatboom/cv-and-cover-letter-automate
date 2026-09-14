@@ -132,30 +132,36 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true; // keep the channel open for the async reply
 });
 
+const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/i;
+
 /* A stopped server surfaces as a bare "Failed to fetch", which tells the user
    nothing. Every call to it goes through here so the offline case reads the
-   same way wherever it happens. */
-async function postToServer(base, path, body) {
+   same way wherever it happens. The token is only sent when one is saved: a
+   loopback server runs without authentication and ignores it. */
+async function postToServer(base, token, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
   try {
-    return await fetch(base + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    return await fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) });
   } catch (e) {
-    throw new Error(`Can't reach the local server at ${base}. Is "npm start" running in the server folder?`);
+    throw new Error(
+      LOOPBACK.test(base)
+        ? `Can't reach the local server at ${base}. Is "npm start" running in the server folder?`
+        : `Can't reach the server at ${base}. Check the address in the extension settings.`
+    );
   }
 }
 
 async function handle(msg, sender) {
-  const { serverUrl } = await chrome.storage.local.get('serverUrl');
+  const { serverUrl, serverToken } = await chrome.storage.local.get(['serverUrl', 'serverToken']);
   const base = serverUrl || DEFAULT_SERVER;
+  const token = serverToken || '';
 
   switch (msg.type) {
     case 'GENERATE': {
-      const res = await postToServer(base, '/generate', msg.payload);
+      const res = await postToServer(base, token, '/generate', msg.payload);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Local server returned ${res.status}.`);
+      if (!res.ok) throw new Error(data.error || `Server returned ${res.status}.`);
       return data;
     }
 
@@ -210,8 +216,14 @@ async function handle(msg, sender) {
     }
 
     case 'SAVE_FILE': {
-      const res = await postToServer(base, '/docx', msg.payload);
-      if (!res.ok) throw new Error(`Local server returned ${res.status} building the file.`);
+      const res = await postToServer(base, token, '/docx', msg.payload);
+      if (!res.ok) {
+        throw new Error(
+          res.status === 401
+            ? 'The server rejected the access token. Check it in the extension settings.'
+            : `Server returned ${res.status} building the file.`
+        );
+      }
       const blob = await res.blob();
       const url = await new Promise((resolve, rejectRead) => {
         const r = new FileReader();

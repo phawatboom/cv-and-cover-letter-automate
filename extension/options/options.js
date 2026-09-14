@@ -295,17 +295,20 @@ async function importResume(file) {
   importMessage('Reading and extracting suggestions…', true, true);
   try {
     const base = $('server').value.trim().replace(/\/$/, '') || 'http://127.0.0.1:8787';
+    const token = $('serverToken').value.trim();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`${base}/parse-resume`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ name: file.name, type: file.type, data: await fileAsBase64(file) })
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `Local server returned ${response.status}.`);
+    if (!response.ok) throw new Error(data.error || `Server returned ${response.status}.`);
     renderResumeSuggestions(data.suggested || {});
     importMessage(`Read ${file.name}. Review the suggestions below.`, true);
   } catch (e) {
-    importMessage(e.message === 'Failed to fetch' ? 'Cannot reach the local server. Start it, then try again.' : e.message, false, true);
+    importMessage(e.message === 'Failed to fetch' ? 'Cannot reach the drafting server. Check the address, then try again.' : e.message, false, true);
   } finally {
     button.disabled = false;
   }
@@ -343,7 +346,7 @@ function applyResumeSuggestions() {
 /* ---------------------------------------------------------------- load -- */
 
 async function load() {
-  const s = await chrome.storage.local.get(['profile', 'templates', 'serverUrl', 'defaultTemplate']);
+  const s = await chrome.storage.local.get(['profile', 'templates', 'serverUrl', 'serverToken', 'defaultTemplate']);
   const p = s.profile || {};
   for (const key of PROFILE_FIELDS) $(key).value = p[key] || '';
   work = Array.isArray(p.work) ? p.work : [];
@@ -360,6 +363,7 @@ async function load() {
   drawLanguages();
 
   $('server').value = s.serverUrl || 'http://127.0.0.1:8787';
+  $('serverToken').value = s.serverToken || '';
   templates = Array.isArray(s.templates) ? s.templates : [];
   /* An imported file can name a template that isn't in this list; fall back
      rather than leaving the editor bound to nothing. */
@@ -473,7 +477,8 @@ async function persist() {
     profile,
     templates,
     defaultTemplate: current,
-    serverUrl: $('server').value.trim().replace(/\/$/, '')
+    serverUrl: $('server').value.trim().replace(/\/$/, ''),
+    serverToken: $('serverToken').value.trim()
   });
 }
 
@@ -485,8 +490,10 @@ $('save').addEventListener('click', async () => {
 
 /* ---------------------------------------------------------------- backup -- */
 
-/* lastJob is deliberately absent: it's a cached ad, not a setting, and it
-   would bloat the file with whatever you last looked at. */
+/* Two deliberate absences. lastJob is a cached ad, not a setting, and would
+   bloat the file with whatever you last looked at. serverToken is a
+   credential that spends API credit, and the export is a plain JSON file
+   people put in cloud storage — retype it after a restore. */
 const BACKUP_KEYS = ['profile', 'templates', 'defaultTemplate', 'serverUrl', 'fieldPaths'];
 const BACKUP_FORMAT = 2;
 

@@ -4,9 +4,30 @@ const path = require('node:path');
 
 const extensionRoot = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, 'manifest.json'), 'utf8'));
-const hostPermissions = manifest.host_permissions.filter((value) => value.startsWith('https:'));
+/* The drafting server is reached by fetch from the background worker, not by
+   injecting a panel into it, so it is the one kind of host permission that
+   must NOT appear in the content-script matches. */
+const SERVER_HOSTS = [
+  'http://127.0.0.1:8787/*',
+  'https://*.up.railway.app/*'
+];
+const hostPermissions = manifest.host_permissions;
 const matches = manifest.content_scripts[0].matches;
-assert.deepEqual(hostPermissions.filter((value) => !matches.includes(value)), [], 'Every declared ATS host should auto-load');
+assert.deepEqual(
+  SERVER_HOSTS.filter((value) => !hostPermissions.includes(value)),
+  [],
+  'The drafting server hosts should stay in host_permissions'
+);
+assert.deepEqual(
+  SERVER_HOSTS.filter((value) => matches.includes(value)),
+  [],
+  'The drafting server should not have a content script injected into it'
+);
+assert.deepEqual(
+  hostPermissions.filter((value) => !SERVER_HOSTS.includes(value) && !matches.includes(value)),
+  [],
+  'Every declared ATS host should auto-load'
+);
 assert.equal(new Set(matches).size, matches.length, 'Content-script host matches should be unique');
 
 const optionsJs = fs.readFileSync(path.join(extensionRoot, 'options', 'options.js'), 'utf8');

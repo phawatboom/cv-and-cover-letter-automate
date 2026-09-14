@@ -321,9 +321,11 @@
       </section>
 
       <section>
-        <h2>Local server</h2>
+        <h2>Drafting server</h2>
         <div class="field"><label for="server">Address</label><input id="server" placeholder="http://127.0.0.1:8787" /></div>
-        <div class="note">Start it with <code>npm start</code> in the <code>server</code> folder before drafting.</div>
+        <div class="field"><label for="serverToken">Access token</label><input id="serverToken" type="password" placeholder="Leave empty for a local server" /></div>
+        <div class="note">Running it locally: start it with <code>npm start</code> in the <code>server</code> folder and leave the token empty.
+          Running it on a host like Railway: use the public address and paste the same <code>APP_TOKEN</code> you set there.</div>
       </section>
 
       <section>
