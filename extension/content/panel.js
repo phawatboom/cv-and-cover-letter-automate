@@ -45,6 +45,12 @@
       background: #141830; color: #E4E6F2; border: 1px solid #2E3660; border-radius: 6px;
       font-size: 12.5px; line-height: 1.6; font-family: inherit;
     }
+    textarea.notes {
+      width: 100%; height: 62px; margin-top: 6px; padding: 8px 9px; resize: vertical;
+      background: #141830; color: #E4E6F2; border: 1px solid #2E3660; border-radius: 6px;
+      font-size: 12.5px; line-height: 1.5; font-family: inherit;
+    }
+    textarea.notes::placeholder { color: #6E77A4; }
     .meta { display: flex; justify-content: space-between; margin-top: 6px;
       font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #8E97C4; }
     select { width: 100%; margin-top: 10px; padding: 8px; border-radius: 6px;
@@ -81,6 +87,7 @@
         phase: 'idle',
         job: null,
         draft: '',
+        notes: '',
         templates: [],
         templateId: null,
         error: '',
@@ -169,6 +176,8 @@
           <div class="sect">
             <label class="lbl">Cover letter</label>
             ${s.templates.length ? `<select id="tpl" data-a="tpl">${opts}</select>` : ''}
+            <textarea class="notes" data-a="notes" rows="3"
+              placeholder="Anything for this letter only — e.g. mention my visa status, lead with the Kubernetes migration, keep it under 150 words">${esc(s.notes)}</textarea>
             <div class="row">
               <button class="act" data-a="capture">Capture job</button>
               <button class="act primary" data-a="write" ${!s.job || s.phase === 'writing' ? 'disabled' : ''}>
@@ -194,7 +203,10 @@
 
       this.el.querySelectorAll('[data-a]').forEach((node) => {
         const a = node.dataset.a;
-        if (a === 'draft') node.addEventListener('input', (e) => (this.state.draft = e.target.value));
+        /* Both text boxes set state without re-rendering. render() replaces
+           innerHTML, so a keystroke that triggered one would take the caret
+           with it. */
+        if (a === 'draft' || a === 'notes') node.addEventListener('input', (e) => (this.state[a] = e.target.value));
         else if (a === 'tpl') node.addEventListener('change', (e) => this.h.onTemplate(e.target.value));
         else node.addEventListener('click', () => this.h[a] && this.h[a]());
       });

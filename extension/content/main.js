@@ -132,7 +132,8 @@
       const res = await send('GENERATE', {
         job,
         template: settings.templates.find((t) => t.id === panel.state.templateId),
-        profile: settings.profile
+        profile: settings.profile,
+        notes: panel.state.notes
       });
       if (!res || res.error) {
         return panel.set({ phase: 'idle', error: res ? res.error : 'No response from the local server.' });

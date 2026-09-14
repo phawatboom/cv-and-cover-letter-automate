@@ -52,6 +52,12 @@ The server and settings page both enforce field allowlists. Résumé parsing can
 
 When you press **Write draft** on a job page, the extension sends one deliberate bundle through the local server: the captured job title/company/description, your saved profile and résumé, and the currently selected template's word limit, voice, paragraph structure, and extra rules. The model is instructed to use only facts in that applicant bundle, and to separate paragraphs with a blank line — the same convention **Save file** relies on to split the letter into `.docx` paragraphs. The resulting draft is shown for review and is never submitted automatically.
 
+## Per-letter instructions
+
+The box under the template picker takes an instruction for the letter in front of you — *mention my visa status*, *lead with the payments migration*, *keep it under 150 words*. It is sent with that draft only and is never saved; a rule you want on every letter belongs in the template's **Extra rules** instead.
+
+It is read as the most specific thing you have said about this application, so it overrides the template's length and structure. It does not override the factual rules: asking for a claim your history does not support still gets refused, because the letter has to survive the interview.
+
 ## Templates
 
 Templates answer *how the letter reads* — word limit, voice, paragraph structure, extra rules — independently of the job site. Six ship as starting points:

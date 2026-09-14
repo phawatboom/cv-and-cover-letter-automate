@@ -110,4 +110,40 @@ for (const expected of [
   'at most 220 words'
 ]) assert.match(draftPrompt, new RegExp(expected));
 
+/* The panel can carry a one-off instruction for a single letter. It has to
+   reach the prompt, stay out of it when empty, and never displace the
+   applicant facts the letter is built from. */
+const jobFixture = {
+  site: 'fixture',
+  title: 'Platform Engineer',
+  company: 'Example Limited',
+  description: 'Maintain a distributed payments platform and improve reliability.',
+  url: 'https://example.test/job/123'
+};
+const profileFixture = {
+  fullName: 'Jane Example',
+  resume: 'Built and operated distributed services.',
+  work: [{ title: 'Engineer', company: 'Previous Limited' }]
+};
+
+const withNotes = buildPrompt({
+  job: jobFixture,
+  profile: profileFixture,
+  notes: '  Mention my 417 working holiday visa and lead with the payments migration.  '
+});
+assert.match(withNotes, /Mention my 417 working holiday visa/, 'the instruction should reach the prompt');
+assert.match(withNotes, /<this-application>/, 'it should be delimited as its own section');
+assert.doesNotMatch(withNotes, /  Mention my 417/, 'it should be trimmed');
+assert.match(withNotes, /Built and operated distributed services/, 'the resume still goes in alongside it');
+
+const withoutNotes = buildPrompt({ job: jobFixture, profile: profileFixture });
+assert.doesNotMatch(withoutNotes, /<this-application>/, 'no empty section when nothing was typed');
+
+assert.doesNotMatch(buildPrompt({ job: jobFixture, profile: profileFixture, notes: '   ' }), /<this-application>/);
+assert.doesNotMatch(buildPrompt({ job: jobFixture, profile: profileFixture, notes: 42 }), /<this-application>/);
+
+/* A long paste is capped rather than allowed to crowd out the ad. */
+const capped = buildPrompt({ job: jobFixture, profile: profileFixture, notes: 'x'.repeat(5000) });
+assert.ok(!capped.includes('x'.repeat(2001)), 'per-letter instructions should be capped at 2000 characters');
+
 console.log('resume import safety: ok');

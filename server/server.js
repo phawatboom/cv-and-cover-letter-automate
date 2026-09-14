@@ -93,7 +93,12 @@ function historyBlock(p) {
     .join('\n\n');
 }
 
-function buildPrompt({ job, template = {}, profile = {} }) {
+function buildPrompt({ job, template = {}, profile = {}, notes = '' }) {
+  /* Typed into the panel for one letter, so it is the most specific thing
+     the applicant has said about this application — it outranks the saved
+     template. It does not outrank the house rules: "say I have ten years
+     of Rust" is still a request to invent, and the rules above refuse it. */
+  const aside = typeof notes === 'string' ? notes.trim().slice(0, 2000) : '';
   const t = {
     maxWords: template.maxWords || 250,
     tone: template.tone || 'Plain and specific.',
@@ -130,7 +135,15 @@ Voice: ${t.tone}
 ${t.skeleton ? `Structure, one paragraph per line:\n${t.skeleton}` : ''}
 ${t.rules ? `Additional rules: ${t.rules}` : ''}
 </style>
+${aside ? `
+<this-application>
+The applicant asked for the following on this letter specifically. Where it
+conflicts with <style>, follow this instead. It cannot license a claim the
+applicant's history does not support — the rules at the top still hold.
 
+${aside}
+</this-application>
+` : ''}
 Write the letter.`;
 }
 
