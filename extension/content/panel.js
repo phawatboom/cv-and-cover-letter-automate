@@ -51,6 +51,24 @@
       font-size: 12.5px; line-height: 1.5; font-family: inherit;
     }
     textarea.notes::placeholder { color: #6E77A4; }
+    .switch { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px;
+      color: #C9CDE6; cursor: pointer; user-select: none; }
+    .switch input { width: 14px; height: 14px; margin: 0; accent-color: #E0A458; cursor: pointer; }
+    .switch input:disabled, .switch input:disabled + span { opacity: .45; cursor: not-allowed; }
+    .tplrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .tplrow select { margin-top: 0; flex: 1; min-width: 0; }
+    button.act.slim { flex: none; padding: 7px 10px; font-size: 12px; }
+    .tpled { margin-top: 8px; padding: 10px; background: #141830; border: 1px solid #262D50; border-radius: 6px; }
+    label.mini { display: block; margin-top: 9px; font-size: 11px; color: #8E97C4; }
+    label.mini:first-child { margin-top: 0; }
+    .tpled input, .tpled textarea {
+      display: block; width: 100%; margin-top: 4px; padding: 6px 8px; resize: vertical;
+      background: #1A1F38; color: #E4E6F2; border: 1px solid #2E3660; border-radius: 5px;
+      font-size: 12.5px; line-height: 1.5; font-family: inherit;
+    }
+    .tpled input[type=number] { width: 96px; }
+    .sent { margin-top: 6px; font-size: 11.5px; color: #8E97C4; }
+    .ok { color: #5FBF8F; }
     .meta { display: flex; justify-content: space-between; margin-top: 6px;
       font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #8E97C4; }
     select { width: 100%; margin-top: 10px; padding: 8px; border-radius: 6px;
@@ -88,6 +106,10 @@
         job: null,
         draft: '',
         notes: '',
+        useTemplate: false,
+        editingTemplate: false,
+        tplDraft: null,
+        tplSaved: false,
         templates: [],
         templateId: null,
         error: '',
@@ -147,6 +169,38 @@
       return `<div class="fill">${lines.join('<br>')}</div>`;
     }
 
+    /* Says exactly what the next draft will be built from. With a template in
+       play the precedence matters too, so it says that as well. */
+    sentLine() {
+      const s = this.state;
+      if (!s.useTemplate) return 'Sent: your instructions, the job ad and your résumé.';
+      const unsaved = s.editingTemplate ? ' Unsaved template edits are used as shown.' : '';
+      return 'Sent: your instructions, the template, the job ad and your résumé. Your instructions win where they conflict.' + unsaved;
+    }
+
+    templateBlock(opts) {
+      const s = this.state;
+      const row = `
+        <div class="tplrow">
+          <select data-a="tpl" aria-label="Template">${opts}</select>
+          ${s.editingTemplate ? '' : '<button class="act slim" data-a="editTemplate">View / edit</button>'}
+          ${s.tplSaved && !s.editingTemplate ? '<span class="sent ok">saved</span>' : ''}
+        </div>`;
+      if (!s.editingTemplate || !s.tplDraft) return row;
+      const d = s.tplDraft;
+      return `${row}
+        <div class="tpled">
+          <label class="mini">Word limit<input type="number" min="80" max="600" data-t="maxWords" value="${esc(d.maxWords)}" /></label>
+          <label class="mini">Voice<textarea rows="2" data-t="tone">${esc(d.tone)}</textarea></label>
+          <label class="mini">Structure — one line per paragraph<textarea rows="5" data-t="skeleton">${esc(d.skeleton)}</textarea></label>
+          <label class="mini">Extra rules<textarea rows="3" data-t="rules">${esc(d.rules)}</textarea></label>
+          <div class="row">
+            <button class="act" data-a="cancelTemplate">Discard</button>
+            <button class="act primary" data-a="saveTemplate">Save template</button>
+          </div>
+        </div>`;
+    }
+
     render() {
       const s = this.state;
       const words = s.draft ? s.draft.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -174,10 +228,15 @@
           </div>
 
           <div class="sect">
-            <label class="lbl">Cover letter</label>
-            ${s.templates.length ? `<select id="tpl" data-a="tpl">${opts}</select>` : ''}
-            <textarea class="notes" data-a="notes" rows="3"
-              placeholder="Anything for this letter only — e.g. mention my visa status, lead with the Kubernetes migration, keep it under 150 words">${esc(s.notes)}</textarea>
+            <label class="lbl" for="clc-notes">Cover letter</label>
+            <textarea class="notes" id="clc-notes" data-a="notes" rows="3" maxlength="2000"
+              placeholder="Your instructions — e.g. lead with the payments migration, mention my 417 visa, keep it under 180 words">${esc(s.notes)}</textarea>
+            <label class="switch">
+              <input type="checkbox" data-a="useTemplate" ${s.useTemplate ? 'checked' : ''} ${s.templates.length ? '' : 'disabled'} />
+              <span>Also apply a template</span>
+            </label>
+            ${s.useTemplate && s.templates.length ? this.templateBlock(opts) : ''}
+            <div class="sent">${this.sentLine()}</div>
             <div class="row">
               <button class="act" data-a="capture">Capture job</button>
               <button class="act primary" data-a="write" ${!s.job || s.phase === 'writing' ? 'disabled' : ''}>
@@ -203,12 +262,19 @@
 
       this.el.querySelectorAll('[data-a]').forEach((node) => {
         const a = node.dataset.a;
-        /* Both text boxes set state without re-rendering. render() replaces
+        /* Text boxes set state without re-rendering. render() replaces
            innerHTML, so a keystroke that triggered one would take the caret
            with it. */
-        if (a === 'draft' || a === 'notes') node.addEventListener('input', (e) => (this.state[a] = e.target.value));
+        if (a === 'draft') node.addEventListener('input', (e) => (this.state.draft = e.target.value));
+        else if (a === 'notes') node.addEventListener('input', (e) => this.h.onNotes(e.target.value));
         else if (a === 'tpl') node.addEventListener('change', (e) => this.h.onTemplate(e.target.value));
+        else if (a === 'useTemplate') node.addEventListener('change', (e) => this.h.onUseTemplate(e.target.checked));
         else node.addEventListener('click', () => this.h[a] && this.h[a]());
+      });
+      this.el.querySelectorAll('[data-t]').forEach((node) => {
+        node.addEventListener('input', (e) => {
+          if (this.state.tplDraft) this.state.tplDraft[node.dataset.t] = e.target.value;
+        });
       });
     }
 

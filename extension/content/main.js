@@ -39,18 +39,68 @@
   if (!isTop) return;
 
   let panel = null;
-  let settings = { templates: [], defaultTemplate: null, profile: {}, fieldPaths: {}, lastJob: null };
+  let settings = {
+    templates: [],
+    defaultTemplate: null,
+    profile: {},
+    fieldPaths: {},
+    lastJob: null,
+    customPrompt: '',
+    useTemplate: false
+  };
 
   async function load() {
-    const s = await chrome.storage.local.get(['templates', 'defaultTemplate', 'profile', 'fieldPaths', 'lastJob']);
+    const s = await chrome.storage.local.get([
+      'templates', 'defaultTemplate', 'profile', 'fieldPaths', 'lastJob', 'customPrompt', 'useTemplate'
+    ]);
     settings = {
       templates: s.templates || [],
       defaultTemplate: s.defaultTemplate,
       profile: s.profile || {},
       fieldPaths: s.fieldPaths || {},
-      lastJob: s.lastJob || null
+      lastJob: s.lastJob || null,
+      customPrompt: typeof s.customPrompt === 'string' ? s.customPrompt : '',
+      /* Off unless turned on: your own instructions are the default brief. */
+      useTemplate: s.useTemplate === true
     };
   }
+
+  /* The options page stores maxWords unclamped; the draft request should
+     not carry a limit the editor itself would refuse. */
+  function clampWords(value) {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) && n > 0 ? Math.min(600, Math.max(80, n)) : 250;
+  }
+
+  function editableCopy(t) {
+    return {
+      maxWords: t.maxWords || 250,
+      tone: t.tone || '',
+      skeleton: t.skeleton || '',
+      rules: t.rules || ''
+    };
+  }
+
+  function fromEditor(d) {
+    return {
+      maxWords: clampWords(d.maxWords),
+      tone: String(d.tone || ''),
+      skeleton: String(d.skeleton || ''),
+      rules: String(d.rules || '')
+    };
+  }
+
+  /* What the next draft uses. Unsaved edits in an open editor are what is on
+     screen, so they are what goes out — saving them is a separate choice. */
+  function templateForDraft() {
+    const s = panel.state;
+    if (!s.useTemplate) return undefined;
+    const saved = settings.templates.find((t) => t.id === s.templateId);
+    if (!saved) return undefined;
+    return s.editingTemplate && s.tplDraft ? { ...saved, ...fromEditor(s.tplDraft) } : saved;
+  }
+
+  let notesTimer = null;
 
   /* Read the ad. On an apply page the ad is often gone (Indeed's smartapply
      host, Workday's form, SEEK's collapsed panel) so we fall back to the job
@@ -131,7 +181,7 @@
       panel.set({ phase: 'writing', error: '' });
       const res = await send('GENERATE', {
         job,
-        template: settings.templates.find((t) => t.id === panel.state.templateId),
+        template: templateForDraft(),
         profile: settings.profile,
         notes: panel.state.notes
       });
@@ -214,9 +264,57 @@
       panel.set({ error: '' });
     },
 
+    /* Kept across pages and jobs: with templates off by default, this box is
+       the brief, and retyping it on every ad would be the main cost of the
+       feature. Debounced so typing is not a storage write per keystroke. */
+    onNotes(value) {
+      panel.state.notes = value;
+      clearTimeout(notesTimer);
+      notesTimer = setTimeout(() => chrome.storage.local.set({ customPrompt: value }), 400);
+    },
+
+    onUseTemplate(on) {
+      chrome.storage.local.set({ useTemplate: on });
+      panel.set({ useTemplate: on, editingTemplate: false, tplDraft: null, tplSaved: false });
+    },
+
+    /* Switching template while editing opens the new one; unsaved edits to
+       the previous one are dropped, as they would be in the options page. */
     onTemplate(id) {
-      panel.state.templateId = id;
       chrome.storage.local.set({ defaultTemplate: id });
+      const t = settings.templates.find((x) => x.id === id);
+      const editing = panel.state.editingTemplate && !!t;
+      panel.set({
+        templateId: id,
+        tplSaved: false,
+        editingTemplate: editing,
+        tplDraft: editing ? editableCopy(t) : null
+      });
+    },
+
+    editTemplate() {
+      const t = settings.templates.find((x) => x.id === panel.state.templateId);
+      if (!t) return;
+      panel.set({ editingTemplate: true, tplSaved: false, tplDraft: editableCopy(t) });
+    },
+
+    cancelTemplate() {
+      panel.set({ editingTemplate: false, tplDraft: null });
+    },
+
+    async saveTemplate() {
+      const { tplDraft, templateId } = panel.state;
+      if (!tplDraft) return;
+      /* Re-read first. The options page may have saved since this tab loaded,
+         and writing this tab's older list back would silently undo that. */
+      const stored = await chrome.storage.local.get('templates');
+      const templates = Array.isArray(stored.templates) ? stored.templates : [];
+      const i = templates.findIndex((t) => t.id === templateId);
+      if (i < 0) return panel.set({ error: 'That template was deleted elsewhere. Pick another one.' });
+      templates[i] = { ...templates[i], ...fromEditor(tplDraft) };
+      await chrome.storage.local.set({ templates });
+      settings.templates = templates;
+      panel.set({ templates, editingTemplate: false, tplDraft: null, tplSaved: true, error: '' });
     },
 
     settings() {
@@ -232,9 +330,13 @@
     await load();
     panel = new CLC.Panel(handlers);
     window.__CLC_SHOW = () => panel.toggle(true);
+    /* A stored default can name a template that has since been deleted. */
+    const known = settings.templates.some((t) => t.id === settings.defaultTemplate);
     panel.set({
       templates: settings.templates,
-      templateId: settings.defaultTemplate || (settings.templates[0] && settings.templates[0].id)
+      templateId: known ? settings.defaultTemplate : settings.templates[0] && settings.templates[0].id,
+      notes: settings.customPrompt,
+      useTemplate: settings.useTemplate && settings.templates.length > 0
     });
     await capture({ silent: false });
   }

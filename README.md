@@ -50,13 +50,15 @@ The server and settings page both enforce field allowlists. Résumé parsing can
 
 ## Drafting a cover letter
 
-When you press **Write draft** on a job page, the extension sends one deliberate bundle through the local server: the captured job title/company/description, your saved profile and résumé, and the currently selected template's word limit, voice, paragraph structure, and extra rules. The model is instructed to use only facts in that applicant bundle, and to separate paragraphs with a blank line — the same convention **Save file** relies on to split the letter into `.docx` paragraphs. The resulting draft is shown for review and is never submitted automatically.
+When you press **Write draft** on a job page, the extension sends one deliberate bundle through the drafting server: the captured job title/company/description, your saved profile and résumé, your instructions, and — only if you switched it on — the selected template's word limit, voice, paragraph structure, and extra rules. The line under the instructions box always states which of those the next draft will use. The model is instructed to use only facts in that applicant bundle, and to separate paragraphs with a blank line — the same convention **Save file** relies on to split the letter into `.docx` paragraphs. The resulting draft is shown for review and is never submitted automatically.
 
-## Per-letter instructions
+## Your instructions, and templates as an add-on
 
-The box under the template picker takes an instruction for the letter in front of you — *mention my visa status*, *lead with the payments migration*, *keep it under 150 words*. It is sent with that draft only and is never saved; a rule you want on every letter belongs in the template's **Extra rules** instead.
+The box at the top of the **Cover letter** section is the brief: *lead with the payments migration*, *mention my 417 visa*, *keep it under 180 words*. By default it is the only guidance sent with the job ad and your résumé — no template, and no default word limit or voice filling the gap. What you type is kept between pages and jobs, so a brief you reuse needs typing once. Up to 2,000 characters.
 
-It is read as the most specific thing you have said about this application, so it overrides the template's length and structure. It does not override the factual rules: asking for a claim your history does not support still gets refused, because the letter has to survive the interview.
+Tick **Also apply a template** to layer one on. A picker and **View / edit** appear: the editor shows the template's word limit, voice, structure and extra rules, and **Save template** writes them back — the same data the settings page edits, so a change made in either place shows up in the other. **Discard** drops the changes. While the editor is open, **Write draft** uses what is on screen, saved or not, so you can try an edit before keeping it. Word limits are held to 80–600.
+
+With both in play, your instructions win where they conflict with the template. Neither overrides the factual rules: asking for a claim your history does not support still gets refused, because the letter has to survive the interview.
 
 ## Templates
 
@@ -135,7 +137,7 @@ Chrome ties an unpacked extension's storage to the absolute path of the folder y
 
 The **Backup** section of settings guards against this:
 
-- **Export to file** downloads a JSON snapshot of your profile, résumé, templates, default template, and any custom "Point at the box" field paths.
+- **Export to file** downloads a JSON snapshot of your profile, résumé, templates, default template, cover-letter instructions and template switch, and any custom "Point at the box" field paths.
 - **Import from file** replaces current settings with a chosen backup, after confirmation. It accepts both its own export format and a hand-edited bare settings object. A backup with an empty or malformed template list, or a missing profile, leaves the corresponding existing data alone rather than wiping it.
 
 The export deliberately excludes the last-captured job ad — that's a cache, not a setting — and never includes the API key, which lives only in `server/.env` and is never sent to the extension. Keep an exported copy somewhere outside the project folder; restoring from it after moving folders or profiles is a ten-second job.

@@ -146,4 +146,35 @@ assert.doesNotMatch(buildPrompt({ job: jobFixture, profile: profileFixture, note
 const capped = buildPrompt({ job: jobFixture, profile: profileFixture, notes: 'x'.repeat(5000) });
 assert.ok(!capped.includes('x'.repeat(2001)), 'per-letter instructions should be capped at 2000 characters');
 
+/* The template is opt-in. Without one there is no <style> block and no
+   default length or voice sneaking in; the instructions are the brief. The
+   house rules are not part of the template and stay either way. */
+const bare = buildPrompt({ job: jobFixture, profile: profileFixture, notes: 'Keep it under 180 words.' });
+assert.doesNotMatch(bare, /<style>/, 'no style block without a template');
+assert.doesNotMatch(bare, /at most 250 words/, 'no default word limit without a template');
+assert.doesNotMatch(bare, /Plain and specific\./, 'no default voice without a template');
+assert.match(bare, /They are your brief/, 'instructions are framed as the whole brief');
+assert.doesNotMatch(bare, /conflict/, 'no reference to a style block that is not there');
+assert.match(bare, /Use only facts that appear in the applicant details/, 'house rules still apply');
+assert.match(bare, /Built and operated distributed services/, 'resume still included');
+assert.match(bare, /Maintain a distributed payments platform/, 'job ad still included');
+
+for (const template of [undefined, null, 'eng']) {
+  assert.doesNotMatch(
+    buildPrompt({ job: jobFixture, profile: profileFixture, template }),
+    /<style>/,
+    `template=${JSON.stringify(template)} should not produce a style block`
+  );
+}
+
+const layered = buildPrompt({
+  job: jobFixture,
+  profile: profileFixture,
+  template: { maxWords: 300, tone: 'Measured.' },
+  notes: 'Keep it under 180 words.'
+});
+assert.match(layered, /<style>[\s\S]*at most 300 words[\s\S]*<\/style>/, 'template applies when sent');
+assert.match(layered, /conflict\s+with <style>, follow these instead/, 'instructions outrank the template');
+assert.ok(layered.indexOf('</style>') < layered.indexOf('<this-application>'), 'instructions come after the template');
+
 console.log('resume import safety: ok');

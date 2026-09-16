@@ -488,13 +488,23 @@ $('save').addEventListener('click', async () => {
   setTimeout(() => $('saved').classList.remove('on'), 1400);
 });
 
+/* The panel can save a template as well. Mirror that here, so that a later
+   Save settings on this page does not write the older copy back over it. */
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.templates || !Array.isArray(changes.templates.newValue)) return;
+  templates = changes.templates.newValue;
+  if (!templates.some((t) => t.id === current)) current = templates[0] && templates[0].id;
+  renderPicker();
+  showTemplate();
+});
+
 /* ---------------------------------------------------------------- backup -- */
 
 /* Two deliberate absences. lastJob is a cached ad, not a setting, and would
    bloat the file with whatever you last looked at. serverToken is a
    credential that spends API credit, and the export is a plain JSON file
    people put in cloud storage — retype it after a restore. */
-const BACKUP_KEYS = ['profile', 'templates', 'defaultTemplate', 'serverUrl', 'fieldPaths'];
+const BACKUP_KEYS = ['profile', 'templates', 'defaultTemplate', 'serverUrl', 'fieldPaths', 'customPrompt', 'useTemplate'];
 const BACKUP_FORMAT = 2;
 
 let ioTimer = null;
@@ -555,6 +565,11 @@ $('importFile').addEventListener('change', async (e) => {
      with nothing to edit — keep the existing templates in that case. */
   if ('templates' in clean && (!Array.isArray(clean.templates) || !clean.templates.length)) delete clean.templates;
   if ('profile' in clean && (typeof clean.profile !== 'object' || !clean.profile)) delete clean.profile;
+  if ('customPrompt' in clean) {
+    if (typeof clean.customPrompt === 'string') clean.customPrompt = clean.customPrompt.slice(0, 2000);
+    else delete clean.customPrompt;
+  }
+  if ('useTemplate' in clean && typeof clean.useTemplate !== 'boolean') delete clean.useTemplate;
 
   try {
     await chrome.storage.local.set(clean);
